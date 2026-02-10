@@ -1,0 +1,97 @@
+let currentTabId = null;
+let currentDomain = null;
+let unsavedSeconds = {}; 
+
+// Helper: Extract domain from URL
+function extractDomain(url) {
+  try {
+    if (!url || url.startsWith("chrome://") || url.startsWith("about:")) return null;
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch { return null; }
+}
+
+// Helper: Save to storage
+function saveUsage() {
+  const today = new Date().toISOString().split("T")[0];
+  if (Object.keys(unsavedSeconds).length === 0) return;
+
+  chrome.storage.local.get([today], (data) => {
+    const usage = data[today] || {};
+    for (const domain in unsavedSeconds) {
+      usage[domain] = (usage[domain] || 0) + unsavedSeconds[domain];
+    }
+    // Clear buffer ONLY after we have retrieved current storage to avoid race conditions
+    unsavedSeconds = {}; 
+    chrome.storage.local.set({ [today]: usage });
+  });
+}
+
+// Helper: Update active tab
+function updateActiveTab(tabId) {
+  currentTabId = tabId;
+  chrome.tabs.get(tabId, (tab) => {
+    if (chrome.runtime.lastError || !tab || !tab.url) {
+      currentDomain = null;
+      return;
+    }
+    currentDomain = extractDomain(tab.url);
+  });
+}
+
+// --- MESSAGE LISTENER (Connects Popup to Background) ---
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getTimes") {
+    const today = new Date().toISOString().split("T")[0];
+    
+    chrome.storage.local.get([today], (data) => {
+      const usage = data[today] || {};
+      const realTimeUsage = { ...usage };
+      
+      // Add the unsaved memory buffer to the saved storage data
+      for (const domain in unsavedSeconds) {
+        realTimeUsage[domain] = (realTimeUsage[domain] || 0) + unsavedSeconds[domain];
+      }
+      
+      sendResponse(realTimeUsage);
+    });
+    return true; // Keep channel open for async response
+  }
+});
+
+// --- EVENT LISTENERS ---
+chrome.tabs.onActivated.addListener(info => { updateActiveTab(info.tabId); });
+chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
+  if (tabId === currentTabId && change.status === "complete") {
+    currentDomain = extractDomain(tab.url);
+  }
+});
+// Removed the strict onFocusChanged listener that was pausing your timer!
+
+// --- INITIALIZATION ---
+// aggressively set the domain when the service worker wakes up
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  if (tabs[0]) updateActiveTab(tabs[0].id);
+});
+
+// --- HEARTBEAT & TIMER ---
+chrome.alarms.create("heartbeat", { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener(() => {
+  saveUsage();
+  // Re-check active tab in case we lost track
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) updateActiveTab(tabs[0].id);
+  });
+});
+
+// THE MAIN TIMER (Runs every 1 second)
+setInterval(() => {
+  // We removed "!isChromeFocused" so it keeps counting when popup is open
+  if (!currentDomain) return;
+
+  unsavedSeconds[currentDomain] = (unsavedSeconds[currentDomain] || 0) + 1;
+
+  // Save to storage every 10 seconds (or if buffer gets big)
+  if (unsavedSeconds[currentDomain] >= 10) {
+    saveUsage();
+  }
+}, 1000);

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 220px;
+      margin: 0;
+      padding: 15px;
+      background-color: #0f1014;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+    }
+    
+    .status-label {
+      font-size: 10px;
+      color: #9aa0a6;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+
+    .active-site {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #8ab4f8; /* Tech Blue */
+    }
+
+    .timer {
+      font-size: 32px;
+      font-weight: 300;
+      margin-bottom: 15px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #3c4043;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+    
+    button:hover { background: #50e3c2; color: #000; }
+  </style>
+</head>
+<body>
+  <div class="status-label">Currently Tracking</div>
+  <div id="domain" class="active-site">...</div>
+  <div id="time" class="timer">0s</div>
+  
+  <button id="open">View Full Analytics</button>
+  <script src="popup.js"></script>
+</body>
+</html>

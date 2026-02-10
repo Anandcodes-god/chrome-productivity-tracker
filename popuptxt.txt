@@ -1,0 +1,37 @@
+function loadData() {
+  chrome.runtime.sendMessage({ action: "getTimes" }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.log("Error connecting to background:", chrome.runtime.lastError);
+      return;
+    }
+
+    const record = response || {};
+    const container = document.getElementById("data");
+    const sortedSites = Object.entries(record).sort((a, b) => b[1] - a[1]);
+
+    if (sortedSites.length === 0) {
+      container.innerHTML = "Start browsing to track time.";
+      return;
+    }
+
+    let html = "<table style='width:100%'>";
+    for (const [site, seconds] of sortedSites) {
+      let timeString = seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)} min`;
+      html += `
+        <tr>
+          <td style="padding: 5px 0;"><b>${site}</b></td>
+          <td style="text-align: right;">${timeString}</td>
+        </tr>`;
+    }
+    html += "</table>";
+    container.innerHTML = html;
+  });
+}
+
+// Update immediately, then every 1 second
+loadData();
+setInterval(loadData, 1000);
+
+document.getElementById("open").addEventListener("click", () => {
+  chrome.tabs.create({ url: "dashboard.html" });
+});
